@@ -44,6 +44,23 @@ class CredibilityScorer:
         "unknown source": 45,
         "unknown blog": 25,
         "blog": 35,
+        "skepticalscience.com": 82,
+        "skeptical science": 82,
+        "c-sharpcorner.com": 60,
+        "marketingprofs.com": 58,
+        "andy masley": 65,
+        "andymasley.com": 65,
+        "dailymail.com": 45,
+        "daily mail": 45,
+        "fox news": 60,
+        "financial post": 65,
+        "businessline": 68,
+        "android authority": 70,
+        "kotaku": 62,
+        "onefootball.com": 55,
+        "ibtimes.com.au": 55,
+        "sportsnaut": 55,
+        "blogger.com": 35,
     }
 
     SENSATIONAL_KEYWORDS = {
@@ -144,9 +161,9 @@ class CredibilityScorer:
 
     @staticmethod
     def _verdict(score: int) -> str:
-        if score >= 75:
+        if score >= 70:
             return "Likely credible"
-        if score >= 50:
+        if score >= 55:
             return "Needs review"
         return "High risk"
 
