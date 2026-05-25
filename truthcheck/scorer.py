@@ -33,34 +33,45 @@ class CredibilityScorer:
 
     SOURCE_TRUST = {
         "associated press": 92,
+        "ap news": 92,
         "reuters": 92,
         "bbc news": 88,
-        "abc news": 82,
-        "the guardian": 82,
-        "cnn": 75,
         "the new york times": 86,
         "washington post": 84,
+        "the guardian": 82,
+        "abc news": 82,
         "al jazeera english": 76,
-        "unknown source": 45,
-        "unknown blog": 25,
-        "blog": 35,
-        "skepticalscience.com": 82,
-        "skeptical science": 82,
+        "cnn": 75,
+        "cnbc": 74,
+        "npr": 86,
+        "the conversation": 84,
+        "nature": 92,
+        "science": 92,
+        "scientific american": 86,
+        "mit technology review": 82,
+        "wired": 78,
+        "techcrunch": 74,
+        "the verge": 72,
+        "android authority": 70,
+        "businessline": 68,
+        "financial post": 65,
+        "kotaku": 62,
         "c-sharpcorner.com": 60,
         "marketingprofs.com": 58,
-        "andy masley": 65,
-        "andymasley.com": 65,
-        "dailymail.com": 45,
-        "daily mail": 45,
         "fox news": 60,
-        "financial post": 65,
-        "businessline": 68,
-        "android authority": 70,
-        "kotaku": 62,
         "onefootball.com": 55,
         "ibtimes.com.au": 55,
         "sportsnaut": 55,
+        "daily mail": 45,
+        "dailymail.com": 45,
+        "unknown source": 45,
+        "unknown blog": 25,
+        "blog": 35,
         "blogger.com": 35,
+        "skepticalscience.com": 82,
+        "skeptical science": 82,
+        "andy masley": 65,
+        "andymasley.com": 65,
     }
 
     SENSATIONAL_KEYWORDS = {
@@ -78,65 +89,103 @@ class CredibilityScorer:
         "doctors hate": 15,
         "anonymous insider": 12,
         "urgent": 8,
+        "breaking": 5,
+        "destroyed": 10,
+        "terrifying": 10,
+        "dangerous": 8,
     }
 
     def __init__(self) -> None:
-        self.analyzer = SentimentIntensityAnalyzer() if SentimentIntensityAnalyzer else _FallbackSentimentAnalyzer()
+        self.analyzer = (
+            SentimentIntensityAnalyzer()
+            if SentimentIntensityAnalyzer
+            else _FallbackSentimentAnalyzer()
+        )
 
-    def score_article(self, article: Article, fact_checks: list[FactCheckResult] | None = None) -> Article:
+    def score_article(
+        self,
+        article: Article,
+        fact_checks: list[FactCheckResult] | None = None,
+    ) -> Article:
         """Score an article and return the same Article with score fields filled."""
 
         fact_checks = fact_checks or []
         text = " ".join([article.title, article.description, article.content]).strip()
+
         article.sentiment_compound = self.analyzer.polarity_scores(text).get("compound", 0.0)
         article.source_trust = self._source_trust(article.source)
         article.keyword_risks = self._keyword_risks(text)
         article.fact_matches = self._match_fact_checks(article.title, fact_checks)
 
-        keyword_penalty = min(60, sum(article.keyword_risks.values()))
+        keyword_penalty = min(65, sum(article.keyword_risks.values()))
         keyword_score = max(0, 100 - keyword_penalty)
-        sentiment_score = max(0, 100 - int(abs(article.sentiment_compound) * 35))
+
+        sentiment_score = max(0, 100 - int(abs(article.sentiment_compound) * 30))
         fact_score = self._fact_score(article.fact_matches)
 
         raw_score = (
-            article.source_trust * 0.35
-            + keyword_score * 0.20
+            article.source_trust * 0.40
+            + keyword_score * 0.25
             + sentiment_score * 0.15
-            + fact_score * 0.30
+            + fact_score * 0.20
         )
+
         article.credibility_score = int(round(max(0, min(100, raw_score))))
         article.verdict = self._verdict(article.credibility_score)
-        article.explanation = self._explain(article, keyword_score, sentiment_score, fact_score)
+        article.explanation = self._explain(
+            article,
+            keyword_score,
+            sentiment_score,
+            fact_score,
+        )
         return article
 
-    def score_articles(self, articles: list[Article], fact_checks: list[FactCheckResult] | None = None) -> list[Article]:
+    def score_articles(
+        self,
+        articles: list[Article],
+        fact_checks: list[FactCheckResult] | None = None,
+    ) -> list[Article]:
         """Score a list of articles."""
 
         return [self.score_article(article, fact_checks) for article in articles]
 
     def _source_trust(self, source_name: str) -> int:
         key = (source_name or "unknown source").strip().lower()
+
         if key in self.SOURCE_TRUST:
             return self.SOURCE_TRUST[key]
+
         for known, score in self.SOURCE_TRUST.items():
             if known in key or key in known:
                 return score
-        return 50
+
+        return 55
 
     def _keyword_risks(self, text: str) -> dict[str, int]:
         lowered = text.lower()
         risks: dict[str, int] = {}
+
         for keyword, weight in self.SENSATIONAL_KEYWORDS.items():
             if keyword in lowered:
                 risks[keyword] = weight
+
         return risks
 
     @staticmethod
-    def _match_fact_checks(title: str, fact_checks: list[FactCheckResult]) -> list[dict[str, str | float]]:
+    def _match_fact_checks(
+        title: str,
+        fact_checks: list[FactCheckResult],
+    ) -> list[dict[str, str | float]]:
         matches: list[dict[str, str | float]] = []
+
         for fact in fact_checks:
-            similarity = SequenceMatcher(None, title.lower(), fact.title.lower()).ratio()
-            if similarity >= 0.25:
+            similarity = SequenceMatcher(
+                None,
+                title.lower(),
+                fact.title.lower(),
+            ).ratio()
+
+            if similarity >= 0.32:
                 matches.append(
                     {
                         "site": fact.site,
@@ -146,38 +195,59 @@ class CredibilityScorer:
                         "similarity": round(similarity, 2),
                     }
                 )
+
         return sorted(matches, key=lambda item: item["similarity"], reverse=True)[:3]
 
     @staticmethod
     def _fact_score(matches: list[dict[str, str | float]]) -> int:
         if not matches:
-            return 60
-        verdict_text = " ".join(str(match.get("verdict", "")).lower() for match in matches)
-        if any(word in verdict_text for word in ["false", "pants on fire", "hoax", "fake"]):
+            return 58
+
+        verdict_text = " ".join(
+            str(match.get("verdict", "")).lower()
+            for match in matches
+        )
+
+        if any(word in verdict_text for word in ["pants on fire", "false", "hoax", "fake"]):
             return 15
-        if any(word in verdict_text for word in ["true", "correct", "real"]):
-            return 90
+
+        if any(word in verdict_text for word in ["mostly false", "half true", "mixed"]):
+            return 40
+
+        if any(word in verdict_text for word in ["mostly true", "true", "correct", "real"]):
+            return 88
+
         return 55
 
     @staticmethod
     def _verdict(score: int) -> str:
-        if score >= 70:
+        if score >= 75:
             return "Likely credible"
         if score >= 55:
             return "Needs review"
         return "High risk"
 
     @staticmethod
-    def _explain(article: Article, keyword_score: int, sentiment_score: int, fact_score: int) -> list[str]:
+    def _explain(
+        article: Article,
+        keyword_score: int,
+        sentiment_score: int,
+        fact_score: int,
+    ) -> list[str]:
         notes = [
             f"Source trust contribution: {article.source_trust}/100 based on the source label.",
             f"Keyword signal: {keyword_score}/100 after checking sensational terms.",
             f"Sentiment signal: {sentiment_score}/100 using headline and description polarity.",
             f"Fact-check signal: {fact_score}/100 based on scraped matches.",
         ]
+
         if article.keyword_risks:
             words = ", ".join(article.keyword_risks.keys())
             notes.append(f"Risk keywords detected: {words}.")
+
         if not article.fact_matches:
-            notes.append("No close fact-check match was found, so the result is not a final verdict.")
+            notes.append(
+                "No close fact-check match was found. The score relies more on source trust, wording, and sentiment."
+            )
+
         return notes
