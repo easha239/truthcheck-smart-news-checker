@@ -1,4 +1,4 @@
-"""Web scraping and fact-check relevance filtering for TruthCheck."""
+"""Web scraping, article detail extraction, and fact-check relevance filtering for TruthCheck."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from urllib.parse import quote_plus
 import requests
 from bs4 import BeautifulSoup
 
-from .models import FactCheckResult
+from .models import Article, FactCheckResult
 
 
 STOPWORDS = {
@@ -24,6 +24,166 @@ STOPWORDS = {
     "said", "says", "say", "claim", "claims", "claimed", "post", "posts",
     "video", "image", "photo", "photos", "online", "social", "media"
 }
+
+
+class ArticleDetailScraper:
+    """Attempts to scrape article-level metadata and readable text from article URLs."""
+
+    def __init__(self, config) -> None:
+        self.config = config
+        self.headers = {
+            "User-Agent": (
+                "TruthCheck academic project bot "
+                "(contact: student project, respectful scraping)"
+            )
+        }
+
+    def enrich_articles(self, articles: list[Article], max_articles: int = 6) -> list[Article]:
+        """Scrape extra article details for a limited number of articles.
+
+        The scraper is intentionally conservative. If a website blocks scraping,
+        uses JavaScript rendering, or has an unsupported layout, the article is
+        returned unchanged.
+        """
+        enriched_articles: list[Article] = []
+
+        for index, article in enumerate(articles):
+            if index < max_articles:
+                enriched_articles.append(self.enrich_article(article))
+                time.sleep(0.7)
+            else:
+                enriched_articles.append(article)
+
+        return enriched_articles
+
+    def enrich_article(self, article: Article) -> Article:
+        """Try to extract author, date, metadata, and readable article text."""
+        if not article.url:
+            return article
+
+        try:
+            response = requests.get(article.url, headers=self.headers, timeout=8)
+            response.raise_for_status()
+
+            content_type = response.headers.get("Content-Type", "").lower()
+            if "text/html" not in content_type:
+                return article
+
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            author = self._extract_author(soup)
+            published_date = self._extract_date(soup)
+            article_text = self._extract_article_text(soup)
+
+            if author and not getattr(article, "author", ""):
+                article.author = author
+
+            if published_date and not getattr(article, "published_at", ""):
+                article.published_at = published_date
+
+            if article_text and len(article_text) > len(article.content or ""):
+                article.content = article_text
+
+        except Exception:
+            return article
+
+        return article
+
+    @staticmethod
+    def _extract_author(soup: BeautifulSoup) -> str:
+        """Extract author from common metadata tags."""
+        selectors = [
+            {"name": "author"},
+            {"property": "article:author"},
+            {"name": "twitter:creator"},
+            {"name": "parsely-author"},
+            {"property": "og:author"},
+        ]
+
+        for attrs in selectors:
+            tag = soup.find("meta", attrs=attrs)
+            if tag and tag.get("content"):
+                return tag["content"].strip()
+
+        author_tag = soup.find(attrs={"class": re.compile("author|byline", re.I)})
+        if author_tag:
+            return author_tag.get_text(" ", strip=True)[:120]
+
+        return ""
+
+    @staticmethod
+    def _extract_date(soup: BeautifulSoup) -> str:
+        """Extract publication date from common metadata tags."""
+        selectors = [
+            {"property": "article:published_time"},
+            {"name": "pubdate"},
+            {"name": "publishdate"},
+            {"name": "timestamp"},
+            {"name": "date"},
+            {"itemprop": "datePublished"},
+        ]
+
+        for attrs in selectors:
+            tag = soup.find("meta", attrs=attrs)
+            if tag and tag.get("content"):
+                return tag["content"].strip()
+
+        time_tag = soup.find("time")
+        if time_tag:
+            if time_tag.get("datetime"):
+                return time_tag["datetime"].strip()
+            return time_tag.get_text(" ", strip=True)
+
+        return ""
+
+    @staticmethod
+    def _extract_article_text(soup: BeautifulSoup) -> str:
+        """Extract readable text from article body or paragraph tags."""
+        for unwanted in soup(["script", "style", "nav", "footer", "header", "aside", "form"]):
+            unwanted.decompose()
+
+        article_container = soup.find("article")
+
+        if article_container:
+            paragraphs = article_container.find_all("p")
+        else:
+            paragraphs = soup.find_all("p")
+
+        cleaned_paragraphs = []
+
+        for paragraph in paragraphs:
+            text = paragraph.get_text(" ", strip=True)
+            if len(text) < 40:
+                continue
+            if ArticleDetailScraper._looks_like_noise(text):
+                continue
+            cleaned_paragraphs.append(text)
+
+        article_text = " ".join(cleaned_paragraphs)
+        article_text = re.sub(r"\s+", " ", article_text).strip()
+
+        return article_text[:2500]
+
+    @staticmethod
+    def _looks_like_noise(text: str) -> bool:
+        """Remove cookie notices, newsletter prompts, and navigation text."""
+        lowered = text.lower()
+
+        noisy_phrases = [
+            "subscribe",
+            "sign up",
+            "cookie",
+            "privacy policy",
+            "terms of service",
+            "advertisement",
+            "all rights reserved",
+            "follow us",
+            "share this article",
+            "newsletter",
+            "enable javascript",
+        ]
+
+        return any(phrase in lowered for phrase in noisy_phrases)
 
 
 class Scraper(ABC):

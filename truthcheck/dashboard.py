@@ -15,7 +15,7 @@ from .config import load_config
 from .data_processor import DataProcessor
 from .models import Article, FactCheckResult
 from .scorer import CredibilityScorer
-from .scrapers import PolitiFactScraper, SnopesScraper, WebScraper
+from .scrapers import ArticleDetailScraper, PolitiFactScraper, SnopesScraper, WebScraper
 
 
 APP_BG = "#07111f"
@@ -44,10 +44,13 @@ class Dashboard:
         self.fetcher = APIFetcher(self.config)
         self.processor = DataProcessor()
         self.scorer = CredibilityScorer()
+
         self.scraper = WebScraper([
             SnopesScraper(self.config),
             PolitiFactScraper(self.config),
         ])
+
+        self.article_detail_scraper = ArticleDetailScraper(self.config)
 
         self.articles: list[Article] = []
         self.fact_checks: list[FactCheckResult] = []
@@ -296,8 +299,10 @@ class Dashboard:
         self.meta_label = ctk.CTkLabel(
             card,
             text="Search a topic to begin",
-            font=ctk.CTkFont(size=15),
+            font=ctk.CTkFont(size=14),
             text_color=TEXT_SECONDARY,
+            wraplength=650,
+            justify="left",
         )
         self.meta_label.grid(row=2, column=0, sticky="w", padx=26, pady=(0, 22))
 
@@ -542,7 +547,7 @@ class Dashboard:
             messagebox.showwarning("Missing topic", "Please enter a headline, URL, or topic.")
             return
 
-        self.status_var.set("Analysing live sources...")
+        self.status_var.set("Analysing live sources and scraping article details...")
         self.analyze_button.configure(state="disabled", text="Analyzing...")
 
         threading.Thread(
@@ -555,6 +560,8 @@ class Dashboard:
         try:
             articles = self.fetcher.fetch_articles(query, page_size=10)
             articles = self.processor.deduplicate(articles)
+            articles = self.article_detail_scraper.enrich_articles(articles, max_articles=5)
+
             fact_checks = self.scraper.search_fact_checks(query, limit_per_site=2)
             scored = self.scorer.score_articles(articles, fact_checks)
 
@@ -677,8 +684,14 @@ class Dashboard:
         article = self.articles[int(selected[0])]
         color = self._verdict_color(article.verdict, article.credibility_score)
 
+        author = getattr(article, "author", "") or "Author unavailable"
+        published_date = getattr(article, "published_at", "") or article.display_date
+        scraped_preview = getattr(article, "content", "") or ""
+
         self.headline_label.configure(text=f"“{article.title}”")
-        self.meta_label.configure(text=f"{article.source}  |  {article.display_date}")
+        self.meta_label.configure(
+            text=f"{article.source}  |  {author}  |  {published_date}"
+        )
         self.score_value.configure(text=f"{article.credibility_score} / 100", text_color=color)
         self.score_verdict.configure(text=article.verdict, text_color=color)
         self.score_desc.configure(text=self._score_description(article.verdict))
@@ -691,7 +704,18 @@ class Dashboard:
             details.append("• No detailed explanation was generated for this article.")
 
         details.append("")
-        details.append(f"URL: {article.url}")
+        details.append("Article Metadata:")
+        details.append(f"• Source: {article.source}")
+        details.append(f"• Author: {author}")
+        details.append(f"• Published Date: {published_date}")
+        details.append(f"• URL: {article.url}")
+
+        if scraped_preview:
+            preview = scraped_preview[:500].strip()
+            if preview:
+                details.append("")
+                details.append("Scraped Article Preview:")
+                details.append(preview + ("..." if len(scraped_preview) > 500 else ""))
 
         if article.keyword_risks:
             details.append("")
