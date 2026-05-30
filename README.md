@@ -1,9 +1,9 @@
 # TruthCheck: Smart News Truth Checker
 
-TruthCheck is a Python desktop application for analysing news credibility risk. It fetches news articles, searches fact-checking sites, applies NLP-based sentiment analysis, detects sensational keywords, calculates a 0 to 100 credibility score, and displays the results in a Tkinter dashboard with charts.
+TruthCheck is a Python desktop application for analysing news credibility risk. It fetches live news articles through NewsAPI, scrapes article-level metadata where available, searches fact-checking sources, applies NLP-based sentiment analysis, detects sensational keywords, calculates a 0 to 100 credibility score, and displays the results in a modern CustomTkinter dashboard with Matplotlib charts.
 ## Dashboard Preview
 
-![TruthCheck Dashboard](C:\Users\ishra\Desktop\UTS\Python programming_aut2026\TruthCheck_Project\TruthCheck\assets\Screenshots\TruthCheck-dashboard.png)
+![TruthCheck Dashboard](assets\Screenshots\TruthCheck-dashboard.png)
 > Important: TruthCheck does not decide whether something is absolutely true or false. It gives assistive credibility indicators based on limited signals.
 
 ## Key Features
@@ -15,7 +15,9 @@ TruthCheck is a Python desktop application for analysing news credibility risk. 
 - Sensational keyword risk detection
 - 0 to 100 credibility score
 - Colour-ready verdict categories: Likely credible, Needs review, High risk
-- Tkinter GUI dashboard with article table, explanations, fact-check matches, and Matplotlib chart
+- - User-selectable article count: 5, 10, 15, or 20 articles
+- Article webpage scraping for author, publication date, metadata, and readable text where available
+- Modern CustomTkinter dashboard with article table, explanations, fact-check matches, scraped metadata, article preview, and Matplotlib chart
 - Object-oriented design using multiple classes
 - Unit tests using Python's built-in `unittest`
 
