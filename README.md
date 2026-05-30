@@ -5,9 +5,6 @@ TruthCheck is a Python desktop application for analysing news credibility risk. 
 ![TruthCheck Dashboard](assets/screenshots/truthcheck-dashboard.png)
 > Important: TruthCheck does not decide whether something is absolutely true or false. It gives assistive credibility indicators based on limited signals.
 
-## Current Implementation Status
-
-TruthCheck currently includes a modern CustomTkinter dashboard, live NewsAPI integration, article webpage scraping, fact-check scraping, credibility scoring, verdict visualization, and unit testing. The application is designed as an academic information aggregator and credibility-risk analysis prototype.
 
 ## Key Features
 - Live article fetching through NewsAPI
