@@ -193,6 +193,6 @@ TruthCheck uses multiple signals to estimate credibility risk. The results are i
 
 - Ishrat Jahan Easha 
 - Mohammad Shafiur Rahman
-- Tahmid Hassan Bhuiyan
+- Tahmid Hassan Bhuiyan   
 MSc Data Science and Innovation
 University of Technology Sydney

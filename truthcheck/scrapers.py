@@ -50,7 +50,7 @@ class ArticleDetailScraper:
         for index, article in enumerate(articles):
             if index < max_articles:
                 enriched_articles.append(self.enrich_article(article))
-                time.sleep(0.7)
+                time.sleep(0.3)
             else:
                 enriched_articles.append(article)
 

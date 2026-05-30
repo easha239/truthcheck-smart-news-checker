@@ -63,6 +63,7 @@ class Dashboard:
         self.root.configure(fg_color=APP_BG)
 
         self.search_var = tk.StringVar(value="artificial intelligence")
+        self.article_count_var = tk.StringVar(value="10")
         self.status_var = tk.StringVar(
             value="Ready. Add NEWS_API_KEY in .env for live NewsAPI results."
         )
@@ -233,6 +234,21 @@ class Dashboard:
         self.search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         self.search_entry.bind("<Return>", lambda _event: self._start_analysis())
 
+        self.article_count_menu = ctk.CTkOptionMenu(
+            topbar,
+            values=["5", "10", "15", "20"],
+            variable=self.article_count_var,
+            width=90,
+            height=54,
+            corner_radius=14,
+            fg_color=CARD_BG,
+            button_color=ACCENT,
+            button_hover_color=ACCENT_HOVER,
+            text_color=TEXT_PRIMARY,
+            font=ctk.CTkFont(size=14),
+        )
+        self.article_count_menu.grid(row=0, column=1, padx=(0, 10))
+
         self.analyze_button = ctk.CTkButton(
             topbar,
             text="Analyze",
@@ -245,7 +261,7 @@ class Dashboard:
             font=ctk.CTkFont(size=16, weight="bold"),
             command=self._start_analysis,
         )
-        self.analyze_button.grid(row=0, column=1)
+        self.analyze_button.grid(row=0, column=2)
 
     def _build_center_area(self, parent: ctk.CTkFrame) -> None:
         center = ctk.CTkFrame(parent, fg_color="transparent")
@@ -547,20 +563,25 @@ class Dashboard:
             messagebox.showwarning("Missing topic", "Please enter a headline, URL, or topic.")
             return
 
+        page_size = int(self.article_count_var.get())
+
         self.status_var.set("Analysing live sources and scraping article details...")
         self.analyze_button.configure(state="disabled", text="Analyzing...")
 
         threading.Thread(
             target=self._run_analysis,
-            args=(query,),
+            args=(query, page_size),
             daemon=True,
         ).start()
 
-    def _run_analysis(self, query: str) -> None:
+    def _run_analysis(self, query: str, page_size: int) -> None:
         try:
-            articles = self.fetcher.fetch_articles(query, page_size=10)
+            articles = self.fetcher.fetch_articles(query, page_size=page_size)
             articles = self.processor.deduplicate(articles)
-            articles = self.article_detail_scraper.enrich_articles(articles, max_articles=5)
+            articles = self.article_detail_scraper.enrich_articles(
+                articles,
+                max_articles=min(3, page_size),
+            )
 
             fact_checks = self.scraper.search_fact_checks(query, limit_per_site=2)
             scored = self.scorer.score_articles(articles, fact_checks)
