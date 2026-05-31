@@ -57,7 +57,7 @@ class Dashboard:
         self.chart_canvas = None
 
         self.root = ctk.CTk()
-        self.root.title("TruthLens | Smart News Truth Checker")
+        self.root.title("TruthCheck | Smart News Truth Checker")
         self.root.geometry("1500x900")
         self.root.minsize(1250, 780)
         self.root.configure(fg_color=APP_BG)
@@ -125,7 +125,7 @@ class Dashboard:
 
         ctk.CTkLabel(
             sidebar,
-            text="TruthLens",
+            text="TruthCheck",
             font=ctk.CTkFont(size=28, weight="bold"),
             text_color=TEXT_PRIMARY,
         ).pack(anchor="w", padx=18, pady=(22, 0))
@@ -544,7 +544,7 @@ class Dashboard:
 
         ctk.CTkLabel(
             footer,
-            text="TruthLens uses AI and multiple verification methods. Results are assistive indicators, not definitive verdicts.",
+            text="TruthCheck uses AI and multiple verification methods. Results are assistive indicators, not definitive verdicts.",
             text_color=MUTED,
             font=ctk.CTkFont(size=12),
         ).grid(row=0, column=0, sticky="w")
