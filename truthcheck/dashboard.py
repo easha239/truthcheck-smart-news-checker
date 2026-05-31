@@ -62,7 +62,7 @@ class Dashboard:
         self.root.minsize(1250, 780)
         self.root.configure(fg_color=APP_BG)
 
-        self.search_var = tk.StringVar(value="artificial intelligence")
+        self.search_var = tk.StringVar(value="")
         self.article_count_var = tk.StringVar(value="10")
         self.status_var = tk.StringVar(
             value="Ready. Add NEWS_API_KEY in .env for live NewsAPI results."
